@@ -151,7 +151,7 @@ JNIEXPORT jint JNICALL Java_HttpM_ReqHttp_Requset
 
     register uint64_t t2 = 0;
 
-    if (err == 0) {
+    if (likely(err == 0)) {
 	t2 = TUTILS::GetUsTime();
     
         STRU_RECV_BUF* recv_buf = httpMng.GetResp(id);
@@ -185,7 +185,8 @@ JNIEXPORT jint JNICALL Java_HttpM_ReqHttp_Requset
 
     if (flags & 2) {
         uint64_t t3 = TUTILS::GetUsTime();
-        LOG("seq=%d use_total=%dus, new_reqtask %dus, error=%d", seqv, t3-t1, t3-t2, err);
+	pid_t self_id = syscall(__NR_gettid);
+        LOG("thread=%d seq=%d use_total=%dus, new_reqtask %dus, error=%d", self_id, seqv, t3-t1, t3-t2, err);
 #if 0
        	LOG("seq=%d use_total=%dus, new_reqtask %dus, error=%d (send=%dus recv=%dus total=%dus)", 
 	      seqv, t3-t1, t3-t2, err, req.send_us, req.recv_us, req.total_us);

@@ -234,31 +234,34 @@ void HttpConn::CloseConn()
 
 int HttpConn::SendData(int sockFd, STRU_ReqHttp& req)
 { 
-    char buf[8192];
     register int i = 0;
     register int n = 0;
     register int send_size = 0;
 
-    if (req.body_len > 0 && req.ext_headers) {  //POST 
-        n = snprintf(buf, sizeof(buf), req_ext_head_body, req.url, _http_addr.host,
+    if (likely(req.body_len > 0)) { //POST    
+	if (likely(req.ext_headers != NULL)) {
+            n = snprintf(_req_buf, sizeof(_req_buf), req_ext_head_body, req.url, _http_addr.host,
 		       	req.ext_headers, req.body_len, req.body);
-    }
-    else if (req.body_len > 0) { //POST
-        n = snprintf(buf, sizeof(buf), req_head_body, req.url, _http_addr.host,
-                        req.body_len, req.body);
+	}
+	else {
+            n = snprintf(_req_buf, sizeof(_req_buf), req_head_body, req.url, _http_addr.host,
+			 req.body_len, req.body);
+	}
     }
     else  { //GET 
-        n = snprintf(buf, sizeof(buf), req_head, req.url, _http_addr.host, 0);
+        n = snprintf(_req_buf, sizeof(_req_buf), req_head, req.url, _http_addr.host, 0);
     }
 
+    char* buf = _req_buf;
     int error;
+
     while (i != n) {
 #if defined(DEF_USE_SSL)
     	send_size = SSL_write(_ssl, buf + i, n - i);
 #else
         send_size = send(sockFd, buf + i, n - i, MSG_NOSIGNAL);
 #endif	    
-	if (send_size > 0) {
+	if (likely(send_size > 0)) {
             i += send_size;
         }
 #if defined(DEF_USE_SSL)        
@@ -319,7 +322,7 @@ int HttpConn::Request(STRU_ReqHttp& req, STRU_RECV_BUF& stru_recv)
 #endif
 
     error = RecvHead(_sockFd, stru_recv);
-    if (error == 0) {
+    if (likely(error == 0)) {
        	if (stru_recv.need_recv_size > 0) {
 	    error = RecvData(_sockFd, stru_recv);
 	}
@@ -379,13 +382,12 @@ int HttpConn::RecvHead(int sockFd, STRU_RECV_BUF& stru_recv)
 #else
         recv_len = recv(sockFd, buf + i, DEF_BUF_SIZE - i, 0);
 #endif     
-     	if (recv_len > 0) {
+     	if (likely(recv_len > 0)) {
             i += recv_len;
             p = strstr(buf, DEF_HEAD_END);
             if (!p) {
                 continue;
 	    }
-
 	   // ParseRespCode(buf, _resp_code);
 	   // stru_recv.code = _resp_code;
 	    
@@ -466,7 +468,7 @@ int HttpConn::RecvData(int sockFd, STRU_RECV_BUF& stru_recv)
 #else	    
         recv_len = recv(sockFd, buf + i, len - i, 0);
 #endif     
-     	if (recv_len > 0) {
+     	if (likely(recv_len > 0)) {
             i += recv_len;		
 	}
 #if defined(DEF_USE_SSL)
