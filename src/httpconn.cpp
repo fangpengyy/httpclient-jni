@@ -4,6 +4,9 @@
 #include "socketfun.h"
 #include <sched.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
 #if 0
 
 # define SSL_ERROR_NONE                  0
@@ -39,6 +42,16 @@ const char* req_head_body ="POST %s HTTP/1.1\r\n"\
                       "Accept: */*\r\n"\
 		      "Cache-Control: no-cache\r\n"\
                       "Connection: keep-alive\r\n"\
+                      "Content-Length: %d\r\n\r\n%s";
+
+//自定义扩展header
+const char* req_ext_head_body ="POST %s HTTP/1.1\r\n"\
+                      "Host: %s\r\n"\
+                      "User-Agent: client\r\n"\
+                      "Accept: */*\r\n"\
+                      "Cache-Control: no-cache\r\n"\
+                      "Connection: keep-alive\r\n"\
+		      "%s\r\n"\
                       "Content-Length: %d\r\n\r\n%s";
 
 
@@ -146,6 +159,12 @@ int HttpConn::OpenConn()
     }
 #endif
 
+#if 0    
+    Socket::SetTOS(_sockFd, 0);
+    Socket::SetMaxSeg(_sockFd, 1460);
+#endif   
+    Socket::SetTcpNoDelay(_sockFd, true);
+
     int ret = Connect(_http_addr, _sockFd);
     if (ret != 0) {
 	CloseConn();    
@@ -213,18 +232,25 @@ void HttpConn::CloseConn()
     }
 }
 
-int HttpConn::SendData(int sockFd, char* url, char* body, int body_len)
+int HttpConn::SendData(int sockFd, STRU_ReqHttp& req)
 { 
-    char buf[2048];
+    char buf[8192];
     register int i = 0;
     register int n = 0;
     register int send_size = 0;
 
-    if (body_len > 0)
-        n = snprintf(buf, sizeof(buf), req_head_body, url, _http_addr.host, body_len, body);
-    else
-        n = snprintf(buf, sizeof(buf), req_head, url, _http_addr.host, 0);
-   
+    if (req.body_len > 0 && req.ext_headers) {  //POST 
+        n = snprintf(buf, sizeof(buf), req_ext_head_body, req.url, _http_addr.host,
+		       	req.ext_headers, req.body_len, req.body);
+    }
+    else if (req.body_len > 0) { //POST
+        n = snprintf(buf, sizeof(buf), req_head_body, req.url, _http_addr.host,
+                        req.body_len, req.body);
+    }
+    else  { //GET 
+        n = snprintf(buf, sizeof(buf), req_head, req.url, _http_addr.host, 0);
+    }
+
     int error;
     while (i != n) {
 #if defined(DEF_USE_SSL)
@@ -259,41 +285,57 @@ int HttpConn::SendData(int sockFd, char* url, char* body, int body_len)
     return 0;
 }
 
-int HttpConn::Request(char* url, char* body, int body_len, STR_RECV_BUF& stru_recv)
+int HttpConn::Request(STRU_ReqHttp& req, STRU_RECV_BUF& stru_recv)
 {
+    _resp_code = -1;	
     _error_type = enum_ok;	
-    register uint64_t t1 = TUTILS::GetUsTime();	
-    if (_status != enum_status_connected || _sockFd < 1) {
+#if 0
+    uint64_t t1;	
+    uint64_t t2;
+    uint64_t t3;
+
+    bool log = req.flags & 2;
+    t1 = TUTILS::GetUsTime();
+#endif
+
+    if (_status != enum_status_connected) {
         _error_type = enum_error_status;
-	LOG("connect error status=%d", _status);
+	LOG("connect seq=%d error status=%d", req.seq, _status);
         return -1;
     }
   
-    int error = SendData(_sockFd, url, body, body_len);
+    int error = SendData(_sockFd, req);
     if (error != 0) {
         CloseConn();	    
         _error_type = enum_error_net_send;
         _status = enum_status_unconnected;
-	LOG("senddata error=%d", error);
+	LOG("senddata seq=%d error=%d", req.seq, error);
         return -1;
     }
 
-    register uint64_t t2 = TUTILS::GetUsTime();
+#if 0    
+    t2 = TUTILS::GetUsTime();
+    req.send_us = t2 - t1;
+#endif
 
     error = RecvHead(_sockFd, stru_recv);
     if (error == 0) {
-	register uint64_t t3 = TUTILS::GetUsTime();  
-        register uint64_t t4 = 0;
-
        	if (stru_recv.need_recv_size > 0) {
 	    error = RecvData(_sockFd, stru_recv);
-	    t4 = TUTILS::GetUsTime(); 
 	}
-	LOG("start:%ld error=%d senddata=%dus, recv_head=%dus, need_recv_size=%d %dus, body_size=%d)",
-		       t1, error, t2 - t1, t3 - t2, (t4 > 0 ? t4-t3 : 0),
+#if 0
+	t3 = TUTILS::GetUsTime();
+        req.recv_us = t3 - t2;
+	req.total_us = t3 - t1;
+
+        if (log) {
+	    LOG("seq=%d error=%d send=%dus, recv=%dus, req_total=%dus, need_recv=%d, body_size=%d)",
+		       req.seq, error, t2 - t1, t3 - t2, t3 - t1,
 		       stru_recv.need_recv_size, stru_recv.body_size);	
-        
+	}
+#endif
 	if (error == 0) {
+            _resp_code = 200;		
             _error_type = enum_net_recv_ok;
 	    return 0;
 	}
@@ -303,13 +345,20 @@ int HttpConn::Request(char* url, char* body, int body_len, STR_RECV_BUF& stru_re
     _error_type = enum_error_net_recv;
     _status = enum_status_unconnected;
 
-    register uint64_t t3 = TUTILS::GetUsTime();
-    LOG("clsoe conn, recvdata =%dus, error=%d", t3 - t2, error);
+#if 0
+    t3 = TUTILS::GetUsTime();
+    req.recv_us = t3 - t2;
+    req.total_us = t3 - t1;
 
+    if (log) {
+        t3 = TUTILS::GetUsTime();
+        LOG("clsoe conn, seq=%d recvdata =%dus, error=%d", req.seq, t3 - t2, error);
+    }
+#endif
     return -1;  
 }
 
-int HttpConn::RecvHead(int sockFd, STR_RECV_BUF& stru_recv)
+int HttpConn::RecvHead(int sockFd, STRU_RECV_BUF& stru_recv)
 {
     register int recv_len = 0;
     register int i = 0;
@@ -337,8 +386,8 @@ int HttpConn::RecvHead(int sockFd, STR_RECV_BUF& stru_recv)
                 continue;
 	    }
 
-	    ParseRespCode(buf, _resp_code);
-	    stru_recv.code = _resp_code;
+	   // ParseRespCode(buf, _resp_code);
+	   // stru_recv.code = _resp_code;
 	    
 	    int recv_body_size = i - (p + 4 - (char*)buf);
 
@@ -349,7 +398,6 @@ int HttpConn::RecvHead(int sockFd, STR_RECV_BUF& stru_recv)
                 
 		stru_recv.body_size = j;
                 
-	//	LOG("content length =%d recv_len=%d", j, recv_body_size);
 		if (j < DEF_BUF_SIZE) {
 		    stru_recv.need_recv_size = j - recv_body_size;
 		    stru_recv.pbody = p + 4;
@@ -403,7 +451,7 @@ int HttpConn::RecvHead(int sockFd, STR_RECV_BUF& stru_recv)
     return 0;
 }
 
-int HttpConn::RecvData(int sockFd, STR_RECV_BUF& stru_recv) 
+int HttpConn::RecvData(int sockFd, STRU_RECV_BUF& stru_recv) 
 {
     register int recv_len = 0;
     register int i = 0;

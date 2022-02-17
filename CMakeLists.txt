@@ -9,7 +9,7 @@ set(EXECSVR_VERSION "${EXECSVR_VERSION_MAJOR}.${EXECSVR_VERSION_MINOR}.${EXECSVR
 set(VER 1.00)
 set(MACRO "-D DEF_USE_SSL")
 
-set(exectype 1)
+set(exectype 0)
 
 # find module
 find_package(Threads REQUIRED)

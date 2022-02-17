@@ -50,7 +50,7 @@ enum HttpNetStatus:int8_t {
 
 #define DEF_BUF_SIZE  (64*1024)
 
-struct STR_RECV_BUF
+struct STRU_RECV_BUF
 {
     int seq{-1};	
     char buf[DEF_BUF_SIZE];
@@ -67,11 +67,11 @@ struct STR_RECV_BUF
 
     int code{0};
 
-    STR_RECV_BUF() {
+    STRU_RECV_BUF() {
 	buf_size = sizeof(buf);
     }
     
-    ~STR_RECV_BUF() {
+    ~STRU_RECV_BUF() {
         if (flags & 0x1 && pstart_recv) {
 	    free(pstart_recv);
 	    pstart_recv = nullptr;
@@ -80,6 +80,19 @@ struct STR_RECV_BUF
    
 };
 
+struct STRU_ReqHttp
+{
+    int seq;	
+    char* url;
+    char* body;
+    int body_len; 
+    char* ext_headers;
+    int flags{0}; 
+
+    uint32_t send_us;
+    uint32_t recv_us;
+    uint32_t total_us;
+};
 
 class HttpConn
 {
@@ -90,7 +103,7 @@ public:
     
     int OpenConn();
     void CloseConn();
-    int Request(char* url, char* body, int body_len, STR_RECV_BUF& stru_recv);
+    int Request(STRU_ReqHttp& req, STRU_RECV_BUF& stru_recv);
 
     ErrorType GetError(){return _error_type;}
     HttpNetStatus GetStatus(){return _status;}
@@ -108,15 +121,15 @@ private:
     SSL* _ssl{NULL};
 private:  
     int Connect(STRU_HTTP_ADDR& addr, int sockFd);
-    int RecvHead(int sockFd, STR_RECV_BUF& stru_recv);
+    int RecvHead(int sockFd, STRU_RECV_BUF& stru_recv);
 
-    int RecvData(int sockFd, STR_RECV_BUF& stru_recv);
-    int SendData(int sockFd, char* url, char* body, int body_len);
+    int RecvData(int sockFd, STRU_RECV_BUF& stru_recv);
+    int SendData(int sockFd, STRU_ReqHttp& req);
     void ParseRespCode(char* p, int& code);
 
     int InitSSL(int sockFd);
     void UnInitSSL();
-    int RecvDataSSL(STR_RECV_BUF& stru_recv);
+    int RecvDataSSL(STRU_RECV_BUF& stru_recv);
 
 };
 

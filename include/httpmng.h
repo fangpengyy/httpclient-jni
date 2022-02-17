@@ -5,8 +5,8 @@
 
 class HttpConn;
 
-struct STR_RECV_BUF;
-
+struct STRU_RECV_BUF;
+struct STRU_ReqHttp;
 
 class HttpMng
 {
@@ -21,8 +21,8 @@ public:
     int Open(int id, const char* host, int port);
     void Close(int id);
 
-    int Request(int id, char* url, char* body, int len);
-    STR_RECV_BUF* GetResp(int id);
+    int Request(int id, STRU_ReqHttp& req);
+    STRU_RECV_BUF* GetResp(int id);
     int GetConnTimes(int id);
 
     int GetStatus(int id);
@@ -33,7 +33,7 @@ private:
     int _max_id;
     static const int _conn_num = 8;
     HttpConn* _conns[_conn_num];
-    STR_RECV_BUF* _recv_buf[_conn_num];
+    STRU_RECV_BUF* _recv_buf[_conn_num];
     char* _pBuf{nullptr};
     std::atomic<bool> _stop{false};
 };

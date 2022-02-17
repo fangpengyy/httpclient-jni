@@ -33,12 +33,12 @@ int HttpMng::InitPool(int maxid)
             return -1;	 
     }
 
-    _pBuf = (char*)malloc(sizeof(STR_RECV_BUF) * _max_id);
+    _pBuf = (char*)malloc(sizeof(STRU_RECV_BUF) * _max_id);
     if (_pBuf == nullptr)
 	return -2;    
 
     for(int i = 0; i < _max_id; i++)
-        _recv_buf[i] = (STR_RECV_BUF*)(_pBuf + i * sizeof(STR_RECV_BUF));
+        _recv_buf[i] = (STRU_RECV_BUF*)(_pBuf + i * sizeof(STRU_RECV_BUF));
 
 #if defined(DEF_USE_SSL)
     SSL_library_init();
@@ -75,9 +75,9 @@ int HttpMng::Open(int id, const char* host, int port)
     return pConn->OpenConn();    
 }
 
-int HttpMng::Request(int id, char* url, char* body, int len)
+int HttpMng::Request(int id, STRU_ReqHttp& req)
 {   
-    return _conns[id]->Request(url, body, len, *_recv_buf[id]);
+    return _conns[id]->Request(req, *_recv_buf[id]);
 }
 
 int HttpMng::GetConnTimes(int id)
@@ -85,7 +85,7 @@ int HttpMng::GetConnTimes(int id)
     return _conns[id]->_connect_times;
 }
 
-STR_RECV_BUF* HttpMng::GetResp(int id)
+STRU_RECV_BUF* HttpMng::GetResp(int id)
 {
     return _recv_buf[id];
 }

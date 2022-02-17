@@ -14,6 +14,37 @@
 #include <unistd.h>
 
 
+#define IPTOS_TOS_MASK		0x1E
+#define IPTOS_TOS(tos)		((tos)&IPTOS_TOS_MASK)
+#define	IPTOS_LOWDELAY		0x10
+#define	IPTOS_THROUGHPUT	0x08
+#define	IPTOS_RELIABILITY	0x04
+#define	IPTOS_MINCOST		0x02
+
+
+int Socket::SetMaxSeg(int sockfd, int mss)
+{
+    socklen_t len = sizeof(mss);	
+#if 0	
+    getsockopt(sockfd, IPPROTO_TCP, TCP_MAXSEG, &mss, &len);
+    printf("mss %d\n", mss);
+#endif
+
+    if (setsockopt(sockfd, IPPROTO_TCP, TCP_MAXSEG, &mss, len) == 0)
+        return 0;
+    printf("mss %d error=%s\n", mss, strerror(errno));
+    return -1;
+}
+
+int Socket::SetTOS(int sockfd, unsigned char val)
+{
+    unsigned char service = 0xe0 | IPTOS_LOWDELAY | IPTOS_RELIABILITY | val;
+    if (setsockopt(sockfd, SOL_IP/*IPPROTO_IP*/, IP_TOS, (void *)&service, sizeof(service)) == 0)
+        return 0;
+    printf("settos error=%s\n", strerror(errno));
+    return -1;    
+}
+
 int Socket::SetNonBlock(int sockfd, bool nonblock)
 {
    int flags = ::fcntl(sockfd, F_GETFL, 0);

@@ -13,6 +13,8 @@
 class Socket
 {
 public:
+    static int SetTOS(int sockfd, unsigned char val);	
+    static int SetMaxSeg(int sockfd, int mss);
     static int SetNonBlock(int sockfd, bool nonblock);
     static void SetRecvBufSize(int sockFd, uint32_t aiSize);
     static void SetSendBufSize(int sockFd, uint32_t aiSize);

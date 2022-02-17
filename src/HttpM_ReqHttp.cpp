@@ -11,10 +11,8 @@
         return (jint)-100;\
     }\
     jstring field##1 = (jstring)env->GetObjectField(obj, id);\
-    str = env->GetStringUTFChars(field##1, nullptr);\
-    if (str == nullptr) {\
-        return (jint)-101;\
-    }
+    str = env->GetStringUTFChars(field##1, nullptr);
+
 
 #define DEF_ReleaseStr(field, str)\
     env->ReleaseStringUTFChars(field##1, str);
@@ -62,11 +60,13 @@ JNIEXPORT jint JNICALL Java_HttpM_ReqHttp_Requset
   (JNIEnv *env, jobject obj, jint id, jobject task_req)
 {
     jfieldID fid;
+    int seqv;
+    int flags = 0;
     int err = -33;
     int body_len = 0;
-    int seqv = 0;
     const char* pbody = nullptr;
     const char* urlv = nullptr;
+    const char* pheaders = nullptr;
 
     uint64_t t1 = TUTILS::GetUsTime();
 
@@ -122,22 +122,39 @@ JNIEXPORT jint JNICALL Java_HttpM_ReqHttp_Requset
 	return -35;
     }
 
-    if (likely(body_len > 0)) {
+    DEF_ReadStr(fid, ext_headers, cls, task_req, pheaders);
+    DEF_GetInt(fid, flags, cls, task_req, flags);
+
+    STRU_ReqHttp req = {
+    seq : seqv,
+    url: (char*)urlv,
+    body:NULL,
+    body_len:body_len,
+    ext_headers : (char*)pheaders,
+    flags : flags
+    };
+
+    if (body_len > 0) {
        	DEF_ReadStr(fid, body, cls, task_req, pbody);
-	err = httpMng.Request(id, (char*)urlv, (char*)pbody, body_len);
+	req.body = (char*)pbody;
+
+	err = httpMng.Request(id, req);
         if (pbody)
             DEF_ReleaseStr(body, pbody);
     }
     else {
-        err = httpMng.Request(id, (char*)urlv, nullptr, 0);
+        err = httpMng.Request(id, req);
     }
     
+    if (pheaders)
+        DEF_ReleaseStr(ext_headers, pheaders);
+
     register uint64_t t2 = 0;
 
     if (err == 0) {
 	t2 = TUTILS::GetUsTime();
     
-        STR_RECV_BUF* recv_buf = httpMng.GetResp(id);
+        STRU_RECV_BUF* recv_buf = httpMng.GetResp(id);
         recv_buf->pbody[recv_buf->body_size] = '\0';
 
         jfieldID sId = env->GetFieldID(cls, "resp", "Ljava/lang/String;");
@@ -166,10 +183,14 @@ JNIEXPORT jint JNICALL Java_HttpM_ReqHttp_Requset
 	}
     }
 
-    register uint64_t t3 = TUTILS::GetUsTime();
-    LOG("start:%ld seq=%d use %dus, new_reqtask %dus, error=%d", 
-	      t1, seqv, t3-t1, t3-t2, err);
-
+    if (flags & 2) {
+        uint64_t t3 = TUTILS::GetUsTime();
+        LOG("seq=%d use_total=%dus, new_reqtask %dus, error=%d", seqv, t3-t1, t3-t2, err);
+#if 0
+       	LOG("seq=%d use_total=%dus, new_reqtask %dus, error=%d (send=%dus recv=%dus total=%dus)", 
+	      seqv, t3-t1, t3-t2, err, req.send_us, req.recv_us, req.total_us);
+#endif
+    }
     return err;	
 }
 

@@ -27,6 +27,8 @@ public class ReqTask {
 	//fullname eg. https://xxxx/xx
 	public String url;
 	
+	public String ext_headers;
+	
 	public int body_len;
 	public String body;
 	

@@ -24,26 +24,29 @@ int main(int argc, char** argv)
     http.SetHttpHost("api.crypto.com", 443);
     int err = http.OpenConn();
 
-    STR_RECV_BUF stru_recv;
+    STRU_RECV_BUF stru_recv;
 
     const char* fmt = "{\"id\":%d,\"jsonrpc\": \"2.0\",\"method\": \"eth_chainId\", \"params\":[]}";
     char body[512];
     int body_len = 0; //snprintf(body, sizeof(body), fmt, 4);
 
-
     const char* url = "https://api.crypto.com/v2/public/get-book?instrument_name=BTC_USDT&depth=10";
 //    const char* url = "https://api.crypto.com/v2/public/get-instruments";
 
+    STRU_ReqHttp req;
+    req.url = (char*) url;
+    req.body_len = 0;
+    req.flags = 2;
+
     int i = 0;
-    for (; i < 100; i++) {
-	    
-        err = http.Request((char*)url, body, body_len, stru_recv);
+    for (; i < 10; i++) {
+        err = http.Request(req, stru_recv);
         printf(" %s\n -------%d\n", stru_recv.pbody, i);
     }
 
     printf("code %d , error %d, status %d\n", http.GetRespCode(), http.GetError(), http.GetStatus());
 
-    err = http.Request((char*)url, body, body_len, stru_recv);
+    err = http.Request(req, stru_recv);
     printf(" %d-------\n\n %s %d\n", i, stru_recv.pbody, stru_recv.body_size);
 
     printf("\n-----%d-----\n", i);

@@ -5,7 +5,7 @@ import HttpM.ReqHttp;
 
 public class httptest {
 		static {
-			System.load("/home/yy/http-m/bin/libhttp-keeper.so");
+			System.load("/home/yy/http-m/http-keeper-so/bin/libhttp-keeper.so");
 		}
 
 		public static void main(String[] args) {
@@ -22,6 +22,9 @@ public class httptest {
 			
 		    reqTask.body =  "{\"id\":5,\"jsonrpc\": \"2.0\",\"method\": \"eth_chainId\", \"params\":[]}";
 		    reqTask.body_len = 0; //reqTask.body.length();
+		    
+		    reqTask.ext_headers ="";
+		    
 		    
 		    for (int i = 0; i < 10; i++) {
 		    	reqTask.seq = i;
